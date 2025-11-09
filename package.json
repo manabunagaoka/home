@@ -5,6 +5,8 @@
   "description": "Local Home AI System (Edge TinyLM + Player Demo)",
   "workspaces": ["apps/*","packages/*"],
   "scripts": {
-    "dev:player": "npx http-server apps/player -p 3000 -a 0.0.0.0"
+    "dev:player": "npx http-server apps/player -p 3000 -a 0.0.0.0",
+    "dev:player:alt": "npx http-server apps/player -p 3001 -a 0.0.0.0",
+    "dev:player:auto": "node tools/dev-player.js"
   }
 }
