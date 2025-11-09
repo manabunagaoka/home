@@ -30,12 +30,34 @@
       <div class="panel">
         <p class="title">Child Player</p>
         <video id="player" controls playsinline></video>
+        <iframe id="webframe" style="display:none;width:100%;height:360px;border:0;border-radius:12px;"></iframe>
         <div class="tiny" id="nowPlaying">Waiting…</div>
       </div>
       <div class="panel">
         <p class="title">Parent Card</p>
         <div><span class="tag">Local Edge ✓</span> <span class="tag">TinyLM ✓</span></div>
         <div class="tiny" style="margin-top:8px" id="status">Idle detector armed (15s)…</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <label class="tiny" style="display:flex;flex-direction:column;gap:6px">
+            Action Mode
+            <select id="actionMode" style="padding:6px;border-radius:8px;border:1px solid #e5e7eb">
+              <option value="video" selected>Video</option>
+              <option value="website">Website (iframe)</option>
+              <option value="link">Open Link</option>
+            </select>
+          </label>
+          <label class="tiny" style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+            <input id="ttsToggle" type="checkbox" /> Speak prompt (TTS)
+          </label>
+          <label class="tiny" style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px">
+            Action URL
+            <input id="actionUrl" placeholder="https://... or ./clip.mp4" style="padding:8px;border-radius:8px;border:1px solid #e5e7eb"/>
+          </label>
+          <div style="grid-column:1/-1;display:flex;gap:8px">
+            <button class="btn" id="btnNudgeNow" style="background:#e0f2fe">Nudge now</button>
+            <button class="btn" id="btnStop" style="background:#fee2e2">Stop media</button>
+          </div>
+        </div>
         <div class="tiny" id="log" style="margin-top:10px;white-space:pre-wrap;max-height:160px;overflow:auto"></div>
       </div>
     </div>
@@ -44,7 +66,10 @@
 
 <!-- Buddy -->
 <div class="buddy">
-  <div id="buddyEmoji" class="emoji">😴</div>
+  <div style="position:relative">
+    <img id="buddyImg" class="emoji" style="display:none;width:64px;height:64px;object-fit:contain" alt="buddy"/>
+    <div id="buddyEmoji" class="emoji">😴</div>
+  </div>
   <div id="buddyBubble" class="bubble" style="display:none">
     <div id="buddyPrompt" style="font-weight:600;margin-bottom:8px;">…</div>
     <div>
@@ -61,8 +86,8 @@ import { buildBigram, generate } from "../../packages/tiny-lm/index.js";
 const corpus = await fetch("../../content/phonics/corpus.txt").then(r=>r.text());
 const model  = buildBigram(corpus);
 
-// Replace with your actual phonics clip URL (CDN or local file under /apps/player)
-const VIDEO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+// Defaults (can be overridden from UI)
+const DEFAULT_VIDEO_URL = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
 const POLICIES = { idleMs: 15000, backoffMs: 120000 };
 let lastMove = Date.now();
@@ -72,12 +97,19 @@ let pending = null;
 const statusEl   = document.getElementById("status");
 const logEl      = document.getElementById("log");
 const buddyEmoji = document.getElementById("buddyEmoji");
+const buddyImg   = document.getElementById("buddyImg");
 const buddyBubble= document.getElementById("buddyBubble");
 const buddyPrompt= document.getElementById("buddyPrompt");
 const btnYes     = document.getElementById("btnYes");
 const btnNo      = document.getElementById("btnNo");
 const player     = document.getElementById("player");
+const webframe   = document.getElementById("webframe");
 const nowPlaying = document.getElementById("nowPlaying");
+const btnNudgeNow= document.getElementById("btnNudgeNow");
+const btnStop    = document.getElementById("btnStop");
+const actionMode = document.getElementById("actionMode");
+const actionUrl  = document.getElementById("actionUrl");
+const ttsToggle  = document.getElementById("ttsToggle");
 
 function log(s){ logEl.textContent = (new Date().toLocaleTimeString())+"  "+s+"\\n"+logEl.textContent; }
 
@@ -97,31 +129,55 @@ function showNudge(prompt){
   pending = { prompt };
   buddyPrompt.textContent = prompt;
   buddyBubble.style.display = "block";
-  buddyEmoji.textContent = "👋✨";
-  buddyEmoji.classList.add("bounce");
+  startBuddyAnimation();
   softChime();
   log("Nudge → "+prompt);
+  if (ttsToggle.checked) speak(prompt);
 }
 
 btnYes.onclick = () => {
   buddyBubble.style.display = "none";
-  buddyEmoji.textContent = "😌";
-  buddyEmoji.classList.remove("bounce");
-  player.src = VIDEO_URL;
-  nowPlaying.textContent = "Playing: phonics clip";
-  player.play().catch(()=>{});
+  stopBuddyAnimationToRelax();
+  const mode = actionMode.value;
+  const url  = (actionUrl.value && actionUrl.value.trim()) || DEFAULT_VIDEO_URL;
+  if (mode === "video") {
+    webframe.style.display = "none"; webframe.src = "";
+    player.style.display = "block";
+    player.src = url;
+    player.play().catch(()=>{});
+    nowPlaying.textContent = `Playing video: ${url}`;
+  } else if (mode === "website") {
+    player.pause(); player.removeAttribute('src'); player.load(); player.style.display = "none";
+    webframe.src = url; webframe.style.display = "block";
+    nowPlaying.textContent = `Opening site: ${url}`;
+  } else {
+    window.open(url, '_blank');
+    nowPlaying.textContent = `Opened link: ${url}`;
+  }
   lastNudge = Date.now(); pending = null;
-  log("Playback start");
+  log("Accepted → action triggered");
 };
 btnNo.onclick = () => {
   buddyBubble.style.display = "none";
-  buddyEmoji.textContent = "😴";
-  buddyEmoji.classList.remove("bounce");
+  stopBuddyAnimationToSleep();
   lastNudge = Date.now(); pending = null;
   log("Child chose: Not now");
 };
 
-function reset(){ lastMove = Date.now(); if(!pending){ buddyEmoji.textContent="😴"; buddyEmoji.classList.remove("bounce"); } }
+btnNudgeNow.onclick = () => {
+  let line = generate(model, 80, 0.7).toLowerCase();
+  if (!line.includes("sound")) line += " the s sound!";
+  line = line.charAt(0).toUpperCase() + line.slice(1);
+  showNudge(line);
+};
+
+btnStop.onclick = () => {
+  player.pause(); player.removeAttribute('src'); player.load();
+  webframe.src = ""; webframe.style.display = "none"; player.style.display = "block";
+  nowPlaying.textContent = "Waiting…";
+};
+
+function reset(){ lastMove = Date.now(); if(!pending){ stopBuddyAnimationToSleep(); } }
 window.addEventListener("mousemove", reset);
 window.addEventListener("keydown", reset);
 
@@ -138,6 +194,78 @@ setInterval(()=>{
     showNudge(line);
   }
 }, 400);
+
+// --- Buddy image sequence (optional) ---
+let frames = [];
+let animTimer = null;
+let animIndex = 0;
+async function loadBuddyFrames(){
+  try{
+    const list = await fetch('public/buddy/manifest.json').then(r=>r.json());
+    const loaded = await Promise.all(list.map(name => new Promise(res=>{
+      const img = new Image();
+      img.onload = ()=>res(img);
+      img.onerror = ()=>res(null);
+      img.src = `public/buddy/${name}`;
+    })));
+    frames = loaded.filter(Boolean);
+    if(frames.length){
+      buddyImg.style.display = 'block';
+      buddyEmoji.style.display = 'none';
+      buddyImg.src = frames[0].src;
+    }
+  }catch(e){ /* fallback to emoji */ }
+}
+function startBuddyAnimation(speedMs=250){
+  if(!frames.length){
+    buddyEmoji.textContent = "👋✨";
+    buddyEmoji.classList.add("bounce");
+    return;
+  }
+  clearInterval(animTimer);
+  animIndex = 0;
+  buddyImg.style.display = 'block';
+  buddyEmoji.style.display = 'none';
+  animTimer = setInterval(()=>{
+    if(!frames.length) return;
+    animIndex = (animIndex + 1) % frames.length;
+    buddyImg.src = frames[animIndex].src;
+  }, speedMs);
+}
+function stopBuddyAnimationToSleep(){
+  clearInterval(animTimer);
+  if(frames.length){
+    buddyImg.src = frames[0].src;
+    buddyImg.style.display = 'block';
+    buddyEmoji.style.display = 'none';
+  } else {
+    buddyEmoji.textContent = "😴";
+    buddyEmoji.classList.remove("bounce");
+    buddyEmoji.style.display = 'block';
+  }
+}
+function stopBuddyAnimationToRelax(){
+  clearInterval(animTimer);
+  if(frames.length){
+    buddyImg.style.display = 'block';
+    buddyEmoji.style.display = 'none';
+  } else {
+    buddyEmoji.textContent = "😌";
+    buddyEmoji.classList.remove("bounce");
+    buddyEmoji.style.display = 'block';
+  }
+}
+loadBuddyFrames();
+
+// --- Simple TTS (Web Speech API) ---
+function speak(text){
+  try{
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1.0; utter.pitch = 1.0; utter.lang = 'en-US';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+  }catch(e){ /* ignore */ }
+}
 </script>
 </body>
 </html>
