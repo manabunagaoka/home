@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Home System – Kid</title>
+<style>
+  :root { --bg:#0f172a; --panel:#ffffff; --border:#e2e8f0; --accent:#6366f1; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto; background:linear-gradient(160deg,#1e293b,#0f172a 60%); color:#fff; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:30px 14px; }
+  .phone { width:380px; max-width:94vw; height:720px; background:var(--panel); color:#0f172a; border-radius:36px; box-shadow:0 20px 50px -10px rgba(0,0,0,.6),0 8px 20px -6px rgba(0,0,0,.4); display:flex; flex-direction:column; overflow:hidden; position:relative; }
+  .header { padding:16px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); background:#f8fafc; }
+  .header img { width:42px; height:42px; border-radius:50%; object-fit:cover; background:#eef2ff; border:1px solid #c7d2fe; }
+  .chat { flex:1; overflow:auto; padding:18px 16px 110px; background:#f1f5f9; }
+  .bubble-row { display:flex; margin:10px 0; }
+  .bubble { max-width:72%; padding:12px 14px; border-radius:20px; font-size:14px; line-height:1.4; box-shadow:0 2px 6px rgba(0,0,0,.08); }
+  .kid { margin-left:auto; }
+  .buddy { margin-right:auto; background:#eef2ff; border:1px solid #c7d2fe; }
+  .kid .bubble { background:#dcfce7; border:1px solid #86efac; }
+  .footer { position:absolute; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--border); padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px; }
+  button { border:0; padding:10px 16px; border-radius:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+  button.primary { background:var(--accent); color:#fff; }
+  button.secondary { background:#f1f5f9; color:#0f172a; }
+  button.danger { background:#fee2e2; color:#991b1b; }
+  .videoWrap { display:none; margin-top:16px; }
+  iframe { width:100%; height:220px; border:0; border-radius:18px; background:#000; }
+  .status { position:absolute; top:12px; right:18px; font-size:11px; background:#e2e8f0; color:#334155; padding:4px 8px; border-radius:999px; }
+  .pulse { animation:p 1.4s infinite; }
+  @keyframes p { 0%,100%{transform:scale(1)}50%{transform:scale(1.06)} }
+</style>
+</head>
+<body>
+  <div class="phone" id="phone">
+    <div class="header">
+      <img id="avatar" alt="buddy" src="public/buddy/png/1_Elmo.png" onerror="this.src='https://via.placeholder.com/42x42?text=+'" />
+      <div style="font-weight:600">Buddy</div>
+      <div class="status" id="status">Idle</div>
+    </div>
+    <div class="chat" id="chat"></div>
+    <div class="videoWrap" id="videoWrap"><iframe id="ytPlayer" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>
+    <div class="footer" id="footer">
+      <button class="primary" id="btnStart">Start</button>
+      <button class="secondary" id="btnMic">🎤 Mic</button>
+      <button class="secondary" id="btnAccept" style="display:none">Yes</button>
+      <button class="secondary" id="btnDecline" style="display:none">Not now</button>
+      <button class="danger" id="btnClear">Clear</button>
+    </div>
+  </div>
+
+<script type="module">
+// Simple polling for pending nudge from localStorage
+const chat = document.getElementById('chat');
+const statusEl = document.getElementById('status');
+const btnStart = document.getElementById('btnStart');
+const btnMic = document.getElementById('btnMic');
+const btnAccept = document.getElementById('btnAccept');
+const btnDecline = document.getElementById('btnDecline');
+const btnClear = document.getElementById('btnClear');
+const videoWrap = document.getElementById('videoWrap');
+const ytPlayer = document.getElementById('ytPlayer');
+
+let listening = false;
+const YT_ID = 'IMk39Yw3o7U'; // Provided YouTube video ID
+const EMBED_URL = `https://www.youtube.com/embed/${YT_ID}?autoplay=1&rel=0`;
+
+function row(role, text){
+  const r = document.createElement('div');
+  r.className = 'bubble-row '+role;
+  const b = document.createElement('div');
+  b.className = 'bubble '+(role==='kid'?'':'buddy');
+  b.textContent = text;
+  r.appendChild(b); chat.appendChild(r); chat.scrollTop = chat.scrollHeight; return b; }
+
+btnStart.onclick = () => {
+  row('buddy','Hi! Waiting for a phonics nudge from Home…');
+  btnStart.style.display='none';
+  statusEl.textContent='Ready';
+};
+
+btnMic.onclick = () => {
+  listening = !listening;
+  statusEl.textContent = listening? 'Listening' : 'Idle';
+  btnMic.textContent = listening? '⏹ Stop' : '🎤 Mic';
+};
+
+btnAccept.onclick = () => {
+  row('kid','Yes');
+  playVideo();
+  sendKidResponse('accepted');
+  hideDecision();
+};
+btnDecline.onclick = () => {
+  row('kid','Not now');
+  sendKidResponse('declined');
+  hideDecision();
+};
+
+btnClear.onclick = () => { chat.innerHTML=''; videoWrap.style.display='none'; ytPlayer.src=''; statusEl.textContent='Idle'; };
+
+function showDecision(){ btnAccept.style.display='inline-block'; btnDecline.style.display='inline-block'; }
+function hideDecision(){ btnAccept.style.display='none'; btnDecline.style.display='none'; }
+
+function playVideo(){ videoWrap.style.display='block'; ytPlayer.src = EMBED_URL; }
+function sendKidResponse(outcome){ localStorage.setItem('kidResponse', JSON.stringify({ outcome, ts:Date.now() })); }
+
+// Poll pending nudge
+let lastPrompt = null;
+setInterval(()=>{
+  const raw = localStorage.getItem('pendingNudge');
+  if(raw){
+    try {
+      const data = JSON.parse(raw);
+      if(data.prompt && data.prompt !== lastPrompt){
+        row('buddy', data.prompt);
+        showDecision();
+        statusEl.textContent='Nudge';
+        statusEl.classList.add('pulse');
+        lastPrompt = data.prompt;
+      }
+    } catch(e){ }
+  }
+}, 1200);
+</script>
+</body>
+</html>
