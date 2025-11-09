@@ -1,0 +1,24 @@
+{
+  "private": true,
+  "name": "home-system",
+  "version": "1.0.0",
+  "description": "Local Home AI System (Edge TinyLM + Player Demo)",
+  "workspaces": ["apps/*","packages/*"],
+  "scripts": {
+    "dev:player": "npx http-server apps/player -p 3000 -a 0.0.0.0"
+  }
+}
+{
+  "private": true,
+  "name": "sesame-home",
+  "version": "1.0.0",
+  "description": "Sesame Home System",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:player": "turbo run dev --filter=player",
+    "validate": "node tools/validate.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
