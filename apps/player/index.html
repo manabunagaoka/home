@@ -216,7 +216,7 @@ async function loadBuddyFrames(){
     }
   }catch(e){ /* fallback to emoji */ }
 }
-function startBuddyAnimation(speedMs=250){
+function startBuddyAnimation(speedMs=500){
   if(!frames.length){
     buddyEmoji.textContent = "👋✨";
     buddyEmoji.classList.add("bounce");
