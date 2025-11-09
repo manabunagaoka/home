@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Home System — Minimal Demo</title>
+<style>
+  :root { --bg:#f6f7fb; --panel:#fff; --border:#e5e7eb; --accent:#6366f1; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto; background:var(--bg); }
+  header { display:flex; gap:14px; padding:14px 20px; background:#fff; border-bottom:1px solid var(--border); }
+  .tab-btn { border:1px solid var(--border); background:#fff; padding:8px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+  .tab-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  main { max-width:1180px; margin:20px auto; display:grid; gap:20px; grid-template-columns: 1.1fr .9fr; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:18px; box-shadow:0 4px 12px rgba(0,0,0,.04); }
+  h2 { margin:0 0 12px; font-size:18px; }
+  h3 { margin:18px 0 8px; font-size:15px; }
+  .tiny { font-size:12px; color:#64748b; }
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); }
+  .tile { border:1px solid var(--border); background:#f8fafc; border-radius:14px; padding:12px; cursor:pointer; position:relative; }
+  .tile.active { outline:2px solid var(--accent); }
+  .tile span { display:block; font-size:12px; color:#334155; }
+  #kidArea { display:flex; flex-direction:column; gap:12px; }
+  #nudgeBox { border:1px solid var(--border); background:#eef2ff; padding:12px; border-radius:12px; display:none; }
+  #actions button { padding:8px 14px; border-radius:12px; border:0; font-weight:600; cursor:pointer; }
+  #acceptBtn { background:#dcfce7; }
+  #declineBtn { background:#f1f5f9; }
+  #generateBtn { background:#6366f1; color:#fff; padding:10px 18px; border-radius:14px; border:0; font-weight:600; cursor:pointer; }
+  #videoWrap { display:none; }
+  video { width:100%; border-radius:14px; background:#000; }
+  .log { font-family:monospace; font-size:11px; background:#0f172a; color:#e2e8f0; padding:10px; border-radius:10px; max-height:140px; overflow:auto; line-height:1.3; }
+  #caregiverExplain { background:#fefce8; border:1px solid #fcd34d; padding:12px; border-radius:12px; font-size:13px; line-height:1.4; }
+  .reason { font-size:11px; color:#475569; margin-top:8px; }
+  .badge { display:inline-block; background:#e0e7ff; color:#3730a3; font-size:11px; padding:4px 8px; border-radius:999px; margin-right:4px; }
+  footer { text-align:center; padding:30px 0 40px; font-size:11px; color:#94a3b8; }
+  @media (max-width:1100px){ main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+  <header>
+    <button class="tab-btn active" data-tab="home">Home</button>
+    <button class="tab-btn" data-tab="kid">Kid</button>
+    <button class="tab-btn" data-tab="caregiver">Caregiver</button>
+  </header>
+
+  <main>
+    <section id="homeTab" class="panel" style="display:block">
+      <h2>Home Dashboard</h2>
+      <div class="tiny">Demo focus: Phonics routine powered by local TinyLM + caregiver visibility.</div>
+      <h3>Routines</h3>
+      <div class="grid" id="routineGrid">
+        <div class="tile" data-routine="morning"><strong>Good Morning</strong><span>Greeting + Phonics</span></div>
+        <div class="tile" data-routine="phonics"><strong>Phonics (S)</strong><span>Letter sound focus</span></div>
+        <div class="tile" data-routine="movement"><strong>Movement</strong><span>Stretch break</span></div>
+        <div class="tile" data-routine="read"><strong>Read Aloud</strong><span>Picture book</span></div>
+      </div>
+      <h3>Upcoming Today</h3>
+      <div id="timeline" class="tiny">07:30 Good Morning • 08:00 Phonics S • 16:00 Movement • 19:30 Read Aloud</div>
+      <h3>Nudge Queue</h3>
+      <div id="queue" class="tiny">(empty)</div>
+    </section>
+
+    <section id="kidTab" class="panel" style="display:none">
+      <h2>Kid Phonics</h2>
+      <div id="kidArea">
+        <button id="generateBtn">Generate Phonics Nudge</button>
+        <div id="nudgeBox">
+          <div><strong id="nudgeText">...</strong></div>
+          <div class="reason" id="nudgeReason"></div>
+          <div id="actions" style="margin-top:10px; display:flex; gap:10px;">
+            <button id="acceptBtn">Yes</button>
+            <button id="declineBtn">Not now</button>
+          </div>
+        </div>
+        <div id="videoWrap"><video id="phonicsVideo" controls playsinline></video></div>
+        <div class="log" id="kidLog"></div>
+      </div>
+    </section>
+
+    <section id="caregiverTab" class="panel" style="display:none">
+      <h2>Caregiver Agent</h2>
+      <div id="caregiverExplain">
+        <p><strong>Why phonics now?</strong> Morning window open, phonics S not yet practiced, last phonics >24h, soft daily goal not met.</p>
+        <p><strong>Caregiver role:</strong> Invite, model, celebrate attempt. If declined, gently offer again later rather than immediately repeating.</p>
+        <p><strong>TinyLM safety:</strong> Guard rails enforce keyword "sound" and max length; we pre-filter for friendly punctuation.</p>
+      </div>
+      <h3>Variant Preview</h3>
+      <div id="variants" class="tiny">(generate from Kid tab first)</div>
+      <h3>Session Log</h3>
+      <div class="log" id="careLog"></div>
+    </section>
+  </main>
+
+  <footer>Local Home System Demo • Static • No cloud calls</footer>
+
+<script type="module">
+import { buildBigram, generate } from "../../packages/tiny-lm/index.js";
+const corpus = await fetch("../../content/phonics/corpus.txt").then(r=>r.text());
+const model = buildBigram(corpus);
+
+// Tabs
+const tabs = document.querySelectorAll('.tab-btn');
+tabs.forEach(btn=>btn.onclick = () => {
+  tabs.forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('main > section').forEach(sec=>sec.style.display='none');
+  document.getElementById(btn.dataset.tab+'Tab').style.display='block';
+});
+
+// Elements
+const generateBtn = document.getElementById('generateBtn');
+const nudgeBox = document.getElementById('nudgeBox');
+const nudgeText = document.getElementById('nudgeText');
+const nudgeReason = document.getElementById('nudgeReason');
+const acceptBtn = document.getElementById('acceptBtn');
+const declineBtn = document.getElementById('declineBtn');
+const phonicsVideo = document.getElementById('phonicsVideo');
+const videoWrap = document.getElementById('videoWrap');
+const kidLog = document.getElementById('kidLog');
+const careLog = document.getElementById('careLog');
+const variantsEl = document.getElementById('variants');
+const queueEl = document.getElementById('queue');
+
+let lastPhonicsTs = 0;
+let cooldownMs = 60_000; // minimal cooldown for demo
+
+function logKid(msg){ kidLog.textContent = new Date().toLocaleTimeString()+"  "+msg+"\n"+kidLog.textContent; }
+function logCare(msg){ careLog.textContent = new Date().toLocaleTimeString()+"  "+msg+"\n"+careLog.textContent; }
+
+function eligible(){
+  const since = Date.now()-lastPhonicsTs;
+  return since > cooldownMs; // simplistic rule
+}
+
+function updateQueue(){
+  queueEl.textContent = eligible()? 'Phonics S nudge ready' : 'Cooldown – available in '+(((cooldownMs-(Date.now()-lastPhonicsTs))/1000)|0)+'s';
+}
+updateQueue();
+setInterval(updateQueue, 1000);
+
+function guard(line){
+  line = line.trim();
+  if(!line.includes('sound')) line += ' the s sound!';
+  line = line.replace(/\s+/g,' ').slice(0,70);
+  if(!/[!?]$/.test(line)) line += '!';
+  return line.charAt(0).toUpperCase()+line.slice(1);
+}
+
+function generateVariants(count=3){
+  return Array.from({length:count},()=> guard(generate(model, 60, 0.7).toLowerCase()));
+}
+
+generateBtn.onclick = () => {
+  if(!eligible()){ logKid('Tried generate during cooldown'); return; }
+  const primary = guard(generate(model, 60, 0.7).toLowerCase());
+  nudgeText.textContent = primary;
+  nudgeReason.textContent = 'Rule: morning slot + cooldown satisfied + phonics not practiced today.';
+  nudgeBox.style.display='block';
+  const vars = generateVariants();
+  variantsEl.innerHTML = vars.map(v=>`<div class='badge'>variant</div>${v}`).join('<br>');
+  logKid('Generated nudge: '+primary);
+  logCare('Preview variants created');
+};
+
+acceptBtn.onclick = () => {
+  phonicsVideo.src = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+  videoWrap.style.display='block';
+  lastPhonicsTs = Date.now();
+  logKid('Accepted nudge → playing video');
+  logCare('Child accepted phonics nudge');
+  nudgeBox.style.display='none';
+};
+
+declineBtn.onclick = () => {
+  lastPhonicsTs = Date.now(); // still start cooldown
+  logKid('Declined nudge');
+  logCare('Child declined; backoff engaged');
+  nudgeBox.style.display='none';
+};
+
+</script>
+</body>
+</html>
