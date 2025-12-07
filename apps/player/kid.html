@@ -32,7 +32,7 @@
 <body>
   <div class="phone" id="phone">
     <div class="header">
-      <img id="avatar" alt="buddy" src="public/buddy/png/1_Elmo.png" onerror="this.src='https://via.placeholder.com/42x42?text=+'" />
+  <img id="avatar" alt="buddy" src="public/buddy/png/1_Elmo.png" onerror="this.src='https://via.placeholder.com/42x42?text=+'" />
       <div style="font-weight:600">Buddy</div>
       <div class="status" id="status">Idle</div>
     </div>
@@ -58,6 +58,7 @@ const btnDecline = document.getElementById('btnDecline');
 const btnClear = document.getElementById('btnClear');
 const videoWrap = document.getElementById('videoWrap');
 const ytPlayer = document.getElementById('ytPlayer');
+const avatarEl = document.getElementById('avatar');
 
 let listening = false;
 const YT_ID = 'IMk39Yw3o7U'; // Provided YouTube video ID
@@ -120,6 +121,27 @@ setInterval(()=>{
     } catch(e){ }
   }
 }, 1200);
+
+// Try to load buddy avatar from manifest; fallback to common filenames
+(async () => {
+  try {
+    const manifest = await fetch('./public/buddy/manifest.json').then(r=>r.json());
+    if (Array.isArray(manifest) && manifest.length) {
+      avatarEl.src = './public/buddy/' + manifest[0];
+      return;
+    }
+  } catch (e) { /* ignore */ }
+  const candidates = [
+    'public/buddy/png/1_Elmo.png',
+    'public/buddy/png/1.png'
+  ];
+  for (const c of candidates) {
+    try {
+      const ok = await fetch(c).then(r=>r.ok);
+      if (ok) { avatarEl.src = c; break; }
+    } catch(e) { /* ignore */ }
+  }
+})();
 </script>
 </body>
 </html>

@@ -4,6 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Home System — Voice Chat + Caregiver Agent</title>
+<script>
+  // Redirect to modern Home controller by default; keep legacy via ?legacy=1
+  if (!location.search.includes('legacy')) {
+    location.replace('./home.html');
+  }
+</script>
 <style>
   html,body { height:100%; margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto; background:#f6f7fb; }
   .wrap { height:100%; display:flex; align-items:center; justify-content:center; }
@@ -40,7 +46,7 @@
   <div class="stage">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="tiny">This is the older single-view demo.</div>
-      <a href="./home-demo.html" class="tiny" style="text-decoration:none;border:1px solid #e5e7eb;padding:6px 10px;border-radius:10px;background:#f1f5f9">Go to new Home Demo ▶</a>
+      <a href="./home.html" class="tiny" style="text-decoration:none;border:1px solid #e5e7eb;padding:6px 10px;border-radius:10px;background:#f1f5f9">Go to Home Controller ▶</a>
     </div>
     <div class="grid">
       <div class="panel">
@@ -90,7 +96,7 @@ function addMsg(who, text){
   bubble.textContent = text;
   if (who==='bot') {
     const img = document.createElement('img');
-    img.src = 'public/buddy/png/1_Elmo.png';
+  img.src = 'public/buddy/png/1_Elmo.png';
     img.alt = 'buddy'; img.style.width='28px'; img.style.height='28px'; img.style.borderRadius='50%'; img.style.border='1px solid #e5e7eb';
     row.appendChild(img);
     row.appendChild(bubble);
